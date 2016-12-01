@@ -441,7 +441,6 @@ public class QSTileHost implements QSTile.Host, Tunable {
         else if (tileSpec.equals("battery")) return new BatteryTile(this);
         else if (tileSpec.equals("saver")) return new DataSaverTile(this);
         else if (tileSpec.equals("night")) return new NightDisplayTile(this);
-        else if (tileSpec.equals("alertslider")) return new AlertSliderTile(this);      
         else if (tileSpec.equals("heads_up")) return new HeadsUpTile(this);
         else if (tileSpec.equals("reboot")) return new RebootTile(this);
         else if (tileSpec.equals("screen_off")) return new ScreenOffTile(this);
@@ -449,6 +448,7 @@ public class QSTileHost implements QSTile.Host, Tunable {
         else if (tileSpec.equals("purgatory")) return new ReaperTile(this);
         else if (tileSpec.equals("music")) return new MusicTile(this);
         else if (tileSpec.equals("volume")) return new VolumeTile(this);
+        else if (tileSpec.equals("alertslider")) return new AlertSliderTile(this);
         // Intent tiles.
         else if (tileSpec.startsWith(IntentTile.PREFIX)) return IntentTile.create(this,tileSpec);
         else if (tileSpec.startsWith(CustomTile.PREFIX)) return CustomTile.create(this,tileSpec);
