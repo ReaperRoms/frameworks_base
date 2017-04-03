@@ -160,6 +160,9 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
     // True if should use light sensor to automatically determine doze screen brightness.
     private final boolean mAllowAutoBrightnessWhileDozingConfig;
 
+    // True if collecting light sensor samples in doze mode.
+    private boolean mUseActiveDozeLightSensorConfig;
+
     // True if we should fade the screen while turning it off, false if we should play
     // a stylish color fade animation instead.
     private boolean mColorFadeFadesConfig;
@@ -566,6 +569,9 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
                     brightness = mPowerRequest.dozeScreenBrightness;
                 }
                 break;
+            case DisplayPowerRequest.POLICY_VR:
+                state = Display.STATE_VR;
+                break;
             case DisplayPowerRequest.POLICY_DIM:
             case DisplayPowerRequest.POLICY_BRIGHT:
             default:
@@ -607,6 +613,7 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
         // Animate the screen state change unless already animating.
         // The transition may be deferred, so after this point we will use the
         // actual state instead of the desired one.
+        final int oldState = mPowerState.getScreenState();
         animateScreenStateChange(state, performScreenOffTransition);
         state = mPowerState.getScreenState();
 
@@ -626,14 +633,15 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
         if (mAutomaticBrightnessController != null) {
             final boolean autoBrightnessEnabledInDoze = mAllowAutoBrightnessWhileDozingConfig
                     && (state == Display.STATE_DOZE || state == Display.STATE_DOZE_SUSPEND);
-            autoBrightnessEnabled = mPowerRequest.useAutoBrightness
+            autoBrightnessEnabled = (mPowerRequest.useAutoBrightness
                     && (state == Display.STATE_ON || autoBrightnessEnabledInDoze)
+                    || mUseActiveDozeLightSensorConfig && autoBrightnessEnabledInDoze)
                     && brightness < 0;
             final boolean userInitiatedChange = autoBrightnessAdjustmentChanged
                     && mPowerRequest.brightnessSetByUser;
             mAutomaticBrightnessController.configure(autoBrightnessEnabled,
                     mPowerRequest.screenAutoBrightnessAdjustment, state != Display.STATE_ON,
-                    userInitiatedChange, mPowerRequest.useTwilight);
+                    userInitiatedChange);
         }
 
         // Apply brightness boost.
@@ -666,10 +674,16 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
             mAppliedAutoBrightness = false;
         }
 
-        // Use default brightness when dozing unless overridden.
-        if (brightness < 0 && (state == Display.STATE_DOZE
-                || state == Display.STATE_DOZE_SUSPEND)) {
-            brightness = mScreenBrightnessDozeConfig;
+        // Use default brightness when dozing unless overridden or if collecting sensor samples.
+        if (state == Display.STATE_DOZE || state == Display.STATE_DOZE_SUSPEND) {
+            if (brightness < 0) {
+                brightness = mScreenBrightnessDozeConfig;
+            } else if (mUseActiveDozeLightSensorConfig) {
+                brightness = Math.min(brightness, mScreenBrightnessDozeConfig);
+                if (DEBUG) {
+                    Slog.d(TAG, "updatePowerState: ALS-based doze brightness: " + brightness);
+                }
+            }
         }
 
         // Apply manual brightness.
@@ -898,6 +912,23 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
                 mPowerState.setColorFadeLevel(1.0f);
                 mPowerState.dismissColorFade();
             }
+        } else if (target == Display.STATE_VR) {
+            // Wait for brightness animation to complete beforehand when entering VR
+            // from screen on to prevent a perceptible jump because brightness may operate
+            // differently when the display is configured for dozing.
+            if (mScreenBrightnessRampAnimator.isAnimating()
+                    && mPowerState.getScreenState() == Display.STATE_ON) {
+                return;
+            }
+
+            // Set screen state.
+            if (!setScreenState(Display.STATE_VR)) {
+                return; // screen on blocked
+            }
+
+            // Dismiss the black surface without fanfare.
+            mPowerState.setColorFadeLevel(1.0f);
+            mPowerState.dismissColorFade();
         } else if (target == Display.STATE_DOZE) {
             // Want screen dozing.
             // Wait for brightness animation to complete beforehand when entering doze
