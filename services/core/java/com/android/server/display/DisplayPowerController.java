@@ -318,10 +318,17 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
 
         int lightSensorRate = resources.getInteger(
                 com.android.internal.R.integer.config_autoBrightnessLightSensorRate);
+        int initialLightSensorRate = resources.getInteger(
+                com.android.internal.R.integer.config_autoBrightnessInitialLightSensorRate);
+        if (initialLightSensorRate == -1) {
+          initialLightSensorRate = lightSensorRate;
+        } else if (initialLightSensorRate > lightSensorRate) {
+          Slog.w(TAG, "Expected config_autoBrightnessInitialLightSensorRate ("
+                  + initialLightSensorRate + ") to be less than or equal to "
+                  + "config_autoBrightnessLightSensorRate (" + lightSensorRate + ").");
+        }
         long brighteningLightDebounce = resources.getInteger(
                 com.android.internal.R.integer.config_autoBrightnessBrighteningLightDebounce);
-        long brighteningLightFastDebounce = resources.getInteger(
-                com.android.internal.R.integer.config_autoBrightnessBrighteningLightFastDebounce);
         long darkeningLightDebounce = resources.getInteger(
                 com.android.internal.R.integer.config_autoBrightnessDarkeningLightDebounce);
         boolean autoBrightnessResetAmbientLuxAfterWarmUp = resources.getBoolean(
@@ -331,7 +338,6 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
         float autoBrightnessAdjustmentMaxGamma = resources.getFraction(
                 com.android.internal.R.fraction.config_autoBrightnessAdjustmentMaxGamma,
                 1, 1);
-
         if (mUseSoftwareAutoBrightnessConfig) {
             int[] lux = resources.getIntArray(
                     com.android.internal.R.array.config_autoBrightnessLevels);
@@ -367,9 +373,9 @@ final class DisplayPowerController implements AutomaticBrightnessController.Call
                         handler.getLooper(), sensorManager, screenAutoBrightnessSpline,
                         lightSensorWarmUpTimeConfig, screenBrightnessRangeMinimum,
                         mScreenBrightnessRangeMaximum, dozeScaleFactor, lightSensorRate,
-                        brighteningLightDebounce, brighteningLightFastDebounce,
-                        darkeningLightDebounce, autoBrightnessResetAmbientLuxAfterWarmUp,
-                        ambientLightHorizon, autoBrightnessAdjustmentMaxGamma);
+                        initialLightSensorRate, brighteningLightDebounce, darkeningLightDebounce,
+                        autoBrightnessResetAmbientLuxAfterWarmUp, ambientLightHorizon,
+                        autoBrightnessAdjustmentMaxGamma, mUseActiveDozeLightSensorConfig);
             }
         }
 
